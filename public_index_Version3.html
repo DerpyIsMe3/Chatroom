@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chatroom for Two</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0; padding: 0;
+      font-family: 'Roboto', Arial, sans-serif;
+      background: linear-gradient(120deg, #f6d365 0%, #fda085 100%);
+      min-height: 100vh;
+    }
+    .site-header {
+      background: #222a36;
+      color: #fff;
+      padding: 24px 0;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(34,42,54,0.10);
+      letter-spacing: 1px;
+    }
+    .site-header h1 {
+      margin: 0;
+      font-size: 2em;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+    .container {
+      max-width: 580px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 8px 32px rgba(34,42,54,0.16);
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 600px;
+    }
+    .chat-area {
+      flex: 1;
+      padding: 32px 24px 16px 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      background: #f7f9fc;
+      border-radius: 18px 18px 0 0;
+    }
+    .chat-message {
+      display: flex;
+      align-items: flex-end;
+      margin-bottom: 18px;
+    }
+    .chat-message.me {
+      flex-direction: row-reverse;
+    }
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      margin: 0 12px;
+      background: #fda085;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.2em;
+      box-shadow: 0 1px 4px rgba(253,160,133,0.10);
+      user-select: none;
+    }
+    .chat-bubble {
+      max-width: 65%;
+      background: #e9eef6;
+      border-radius: 14px;
+      padding: 12px 18px;
+      font-size: 1.08em;
+      position: relative;
+      word-break: break-word;
+      transition: background 0.2s;
+      box-shadow: 0 1px 4px rgba(34,42,54,0.10);
+    }
+    .chat-message.me .chat-bubble {
+      background: #f6d365;
+      color: #222a36;
+    }
+    .chat-form {
+      display: flex;
+      border-top: 1px solid #eee;
+      background: #fff;
+      padding: 18px 16px;
+      border-radius: 0 0 18px 18px;
+    }
+    .chat-form input {
+      flex: 1;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 1em;
+      margin-right: 12px;
+      outline: none;
+      background: #f8f8f8;
+      transition: background 0.2s;
+      box-shadow: 0 1px 2px rgba(34,42,54,0.07);
+    }
+    .chat-form input:focus {
+      background: #e9eef6;
+    }
+    .chat-form button {
+      background: #fda085;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 24px;
+      font-size: 1em;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+      box-shadow: 0 1px 2px rgba(253,160,133,0.09);
+    }
+    .chat-form button:hover {
+      background: #fc8c47;
+    }
+    @media (max-width: 640px) {
+      .container {
+        margin: 0;
+        border-radius: 0;
+        min-height: 100vh;
+      }
+      .chat-area {
+        padding: 18px 6px 8px 6px;
+      }
+      .chat-form {
+        padding: 14px 6px;
+        border-radius: 0;
+      }
+    }
+    .footer {
+      text-align: center;
+      padding: 18px 0 0 0;
+      color: #444;
+      font-size: 0.98em;
+      opacity: 0.76;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <h1>🌐 My Chatroom Website</h1>
+    <div style="font-size:1.1em;font-weight:400;margin-top:8px;opacity:.85">Private chat for you and your friend</div>
+  </div>
+  <div class="container">
+    <div class="chat-area" id="chat"></div>
+    <form id="form" class="chat-form" autocomplete="off">
+      <input id="input" placeholder="Type your message..." autocomplete="off" />
+      <button id="send" type="submit">Send</button>
+    </form>
+  </div>
+  <div class="footer">
+    © 2025 My Chatroom Website. Made with ❤️ for friends.
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Simple "user" detection for demo: alternate between Me and Friend
+    let user = localStorage.getItem("chatroom_user");
+    if (!user) {
+      user = Math.random() < 0.5 ? "Me" : "Friend";
+      localStorage.setItem("chatroom_user", user);
+    }
+    // Optionally, you can prompt for a name instead:
+    // user = prompt('Enter your name:', user || '') || 'Me';
+    // localStorage.setItem("chatroom_user", user);
+
+    // Simple avatars: use first letter of user
+    function avatarLetter(name) {
+      return name.charAt(0).toUpperCase();
+    }
+
+    const socket = io();
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const chat = document.getElementById('chat');
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (input.value.trim()) {
+        socket.emit('chat message', { user, msg: input.value.trim() });
+        input.value = '';
+      }
+    });
+
+    socket.on('chat message', function(data) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'chat-message' + (data.user === user ? ' me' : '');
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = avatarLetter(data.user);
+
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble';
+      bubble.textContent = data.msg;
+
+      messageDiv.appendChild(avatar);
+      messageDiv.appendChild(bubble);
+
+      if (data.user === user) {
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+      } else {
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+      }
+      chat.appendChild(messageDiv);
+      chat.scrollTop = chat.scrollHeight;
+    });
+  </script>
+</body>
+</html>
